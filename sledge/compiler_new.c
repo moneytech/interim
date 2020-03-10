@@ -40,9 +40,14 @@ Cell* insert_symbol(Cell* symbol, Cell* cell, env_t** env) {
   }
     
   e = malloc(sizeof(env_entry));
-  memcpy(e->name, (char*)symbol->ar.addr, symbol->dr.size);
-  e->cell = cell;
+  int ret = snprintf(e->name, MAX_SYMBOL_SIZE, "%s", (char*)symbol->ar.addr);
+  if (ret >= MAX_SYMBOL_SIZE) {
+    printf("[insert_symbol] max symbol size exceeded by %d\n", ret - MAX_SYMBOL_SIZE + 1);
+    free(e);
+    return alloc_nil();
+  }
 
+  e->cell = cell;
   //printf("[insert_symbol] %s entry at %p (cell: %p)\r\n",symbol->ar.addr,e,e->cell);
   sm_put(*env, e->name, e);
 
@@ -1112,7 +1117,7 @@ Cell* compile_expr(Cell* expr, Frame* frame, Cell* return_type) {
       
       while ((key = car(args))) {
         if (key->tag != TAG_SYM) {
-          printf("<every second argument of struct following the struct'sname has to be a symbol>\r\n");
+          printf("<every second argument of struct following the struct's name has to be a symbol>\r\n");
           return 0;
         }
         jit_lea(R0,key);
@@ -1146,11 +1151,13 @@ Cell* compile_expr(Cell* expr, Frame* frame, Cell* return_type) {
       }
 
       // load the struct name
-      jit_lea(ARGR0,name_sym);
+      jit_push(R0,R0);
       jit_movr(ARGR1,R0);
+      jit_lea(ARGR0,name_sym);
       push_frame_regs(frame->f);
       jit_call2(insert_global_symbol, "insert_global_symbol");
       pop_frame_regs(frame->f);
+      jit_pop(R0,R0);
       
       break;
     }
